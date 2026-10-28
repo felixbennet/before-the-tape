@@ -5,6 +5,8 @@
   "scripts": {
     "smoke": "tsx scripts/smoke.ts",
     "sam": "tsx scripts/sam.ts",
+    "check": "tsx scripts/check.ts",
+    "test": "tsx scripts/events.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

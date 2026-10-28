@@ -33,3 +33,10 @@ and run them through `pnpm sam` to decide go or no-go.
 - Object ids changed at scene cuts (7 ids for what is mostly 4 buckles).
   So counting cannot trust ids alone; it has to count events (enter, leave)
   and reconcile against the scan.
+- Built that event logic (`src/events.ts`): parcel region from the median of
+  SAM's parcel boxes, item tracks joined across short gaps, and three
+  outcomes. Tested on hand-made tracks (`pnpm test`): drop-in, in then taken
+  back out, re-found under a new id, spare belt left on the table, lost on
+  the rim, and one of two scanned items missing.
+- `pnpm check <clip>` runs the whole thing on a clip. It needs real bench
+  footage with a parcel in frame to be meaningful.
