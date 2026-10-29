@@ -83,6 +83,11 @@ and run them through `pnpm sam` to decide go or no-go.
   cited each step by frame (scan, into pouch, pouch into box, care card,
   lid, box into mailer) and in the wrong-scan run said the second wallet
   "never picked and remains as spare stock".
+- SAM mislabels came from naming things by what they are, not how they
+  look: "leather care card" landed on the brown box lid. Prompted as
+  "white printed card" instead, SAM found only the real card, and only on
+  the frames it lies in the box (77 to 82), with nothing on the lid.
+  Item phrases will describe appearance from now on.
 - Also fixed a bug where the frame counter read "100," as not-a-number,
   which slipped past the spend cap. The cap now refuses any unreadable
   cost. Spend to date: $0.72.

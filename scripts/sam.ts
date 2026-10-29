@@ -6,7 +6,9 @@
 import { prepareClip, imageMedia, segment, samCost } from '../src/sam.js';
 
 const [src, phrase] = process.argv.slice(2);
-const fps = Number(process.argv[process.argv.indexOf('--fps') + 1] || 5);
+const fpsAt = process.argv.indexOf('--fps');
+const fps = fpsAt === -1 ? 5 : Number(process.argv[fpsAt + 1]);
+if (!Number.isFinite(fps) || fps <= 0) throw new Error('--fps must be a positive number');
 if (!src || !phrase) throw new Error('usage: pnpm sam <image|clip|url> "<noun phrase>" [--fps 5]');
 
 const isVideo = /\.(mov|mp4|m4v)$/i.test(src);
