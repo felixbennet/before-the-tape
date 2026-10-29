@@ -68,6 +68,21 @@ and run them through `pnpm sam` to decide go or no-go.
 - Telling detail: SAM's tracks alone said MISMATCH for the wallet (it
   vanished into the pouch, so it never looked "inside the box"). Neither
   model gets this right alone; together they do.
+- Two more real packs from the live bench, plus a wrong-scan test. Packing
+  is live production, so nobody is asked to make mistakes on purpose;
+  instead the mismatch test gives the checker a scan list that is wrong.
+
+  | Clip | Scan list given | SAM tracks alone | SAM + Muse Spark | Correct answer |
+  |---|---|---|---|---|
+  | bench-02 | 1 wallet, 1 care card | wallet uncertain | CONSISTENT | consistent |
+  | bench-05 | 1 wallet | uncertain | CONSISTENT | consistent |
+  | bench-06 | 1 wallet, 1 care card | care card mismatch | CONSISTENT | consistent |
+  | bench-02 | 2 wallets, 1 care card (wrong on purpose) | mismatch | MISMATCH | mismatch |
+
+  4 of 4 right with Spark; SAM's tracks alone were right on 1 of 4. Spark
+  cited each step by frame (scan, into pouch, pouch into box, care card,
+  lid, box into mailer) and in the wrong-scan run said the second wallet
+  "never picked and remains as spare stock".
 - Also fixed a bug where the frame counter read "100," as not-a-number,
   which slipped past the spend cap. The cap now refuses any unreadable
-  cost. Spend to date: $0.33.
+  cost. Spend to date: $0.72.
