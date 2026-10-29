@@ -8,7 +8,7 @@
 //    gives the verdict, following nested packaging and citing frames.
 import fs from 'node:fs';
 import { prepareClip, segment } from '../src/sam.js';
-import { packEvents, parcelTrack, verdict, type PackEvent, type Verdict } from '../src/events.js';
+import { packEvents, parcelTrack, pickFrames, trackEdges, verdict, type PackEvent, type Verdict } from '../src/events.js';
 import { annotatedFrames, sparkVerdict, type Layer } from '../src/spark.js';
 
 const args = process.argv.slice(2);
@@ -42,7 +42,8 @@ for (const [i, item] of items.entries()) {
   console.log(`  ${item.phrase}: expected ${item.expected}, net ${v.net} -> ${v.verdict}`);
 }
 
-const frames = annotatedFrames(clip.file, layers, fps, fps, clip.frames);
+const edges = layers.slice(1).flatMap((l) => trackEdges(l.hits, clip.frames));
+const frames = annotatedFrames(clip.file, layers, pickFrames(clip.frames, fps, edges), fps);
 const spark = await sparkVerdict(frames, items, fps);
 console.log(`\nMuse Spark (${frames.length} frames): ${spark.summary}`);
 for (const s of spark.steps) console.log(`  ${s.seconds.toFixed(1)}s  frame ${s.frame}  ${s.what}`);

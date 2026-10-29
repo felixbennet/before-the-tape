@@ -2,7 +2,7 @@
 //   pnpm test
 import assert from 'node:assert/strict';
 import type { Box, Hit } from '../src/sam.js';
-import { packEvents, parcelRegion, parcelTrack, verdict } from '../src/events.js';
+import { packEvents, parcelRegion, parcelTrack, pickFrames, trackEdges, verdict } from '../src/events.js';
 
 const parcel: Box = [400, 400, 800, 800];
 // A 60 px item whose center follows the given points, one point per frame.
@@ -47,5 +47,9 @@ const moving: Hit[] = [
 const track = parcelTrack(moving)!;
 const intoMovedBox = path(5, 0, [[400, 600], [500, 400], [600, 250], [700, 200], [700, 200]]);
 assert.equal(verdict(packEvents(intoMovedBox, track, { totalFrames: 40 }), 1).verdict, 'consistent');
+
+// Spark gets one frame per second plus a dense run around the moment an item vanished.
+assert.deepEqual(trackEdges(dropIn, 40), [4]);
+assert.deepEqual(pickFrames(12, 5, [7], 1), [0, 5, 6, 7, 8, 10]);
 
 console.log('events: all checks passed');

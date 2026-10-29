@@ -77,6 +77,26 @@ function tracks(hits: Hit[], gap: number): Hit[][] {
   return merged;
 }
 
+// Frames where an item track starts or ends inside the clip: the moments an item
+// appeared, vanished into packaging, or left. Muse Spark gets extra frames here.
+export function trackEdges(itemHits: Hit[], totalFrames: number, gap = 4): number[] {
+  const edges = tracks(itemHits, gap).flatMap((t) => [t[0].frame, t.at(-1)!.frame]);
+  return [...new Set(edges)].filter((f) => f > 0 && f < totalFrames - 1).sort((a, b) => a - b);
+}
+
+// Which frames Muse Spark sees: one per second, plus every frame within `window`
+// of a track edge, capped to keep cost down.
+export function pickFrames(totalFrames: number, fps: number, edges: number[], window = 3, cap = 45): number[] {
+  const picked = new Set<number>();
+  for (let f = 0; f < totalFrames; f += fps) picked.add(f);
+  for (const e of edges) {
+    for (let f = e - window; f <= e + window; f++) {
+      if (f >= 0 && f < totalFrames && picked.size < cap) picked.add(f);
+    }
+  }
+  return [...picked].sort((a, b) => a - b);
+}
+
 export function packEvents(itemHits: Hit[], parcel: Box | ((frame: number) => Box | null), opts: { totalFrames: number; band?: number; gap?: number; settle?: number }): PackEvent[] {
   const { totalFrames, band = 0.1, gap = 4, settle = 3 } = opts;
   const parcelAt = typeof parcel === 'function' ? parcel : () => parcel;

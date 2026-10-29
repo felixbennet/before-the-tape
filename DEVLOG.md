@@ -59,6 +59,15 @@ and run them through `pnpm sam` to decide go or no-go.
   and answered UNCERTAIN because the wallet going into the pouch fell
   between its sampled frames. That is the behaviour we want: it would
   rather say "I did not see it" than guess.
+- Then let SAM tell Spark where to look: besides one frame per second,
+  Spark now gets every frame around the moments SAM saw an item appear or
+  vanish (45 frames for the 20 s clip). Same clip, rerun: CONSISTENT. Spark
+  cited the wallet going into the pouch at 10.0 s, the pouch into the box
+  at 15.0 s, the care card at 17.0 s, the lid at 18.0 s, and noted the
+  spare wallets on the desk were never touched.
+- Telling detail: SAM's tracks alone said MISMATCH for the wallet (it
+  vanished into the pouch, so it never looked "inside the box"). Neither
+  model gets this right alone; together they do.
 - Also fixed a bug where the frame counter read "100," as not-a-number,
   which slipped past the spend cap. The cap now refuses any unreadable
-  cost. Spend to date: $0.18.
+  cost. Spend to date: $0.33.

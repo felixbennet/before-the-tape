@@ -12,13 +12,13 @@ export type Layer = { label: string; color: string; hits: Hit[] };
 export type SparkStep = { frame: number; seconds: number; what: string };
 export type SparkResult = { verdict: Verdict; summary: string; steps: SparkStep[]; counts: { item: string; expected: number; seen_in: number }[] };
 
-// Every `every`-th frame of the downsampled clip, with each layer's boxes and a
-// time stamp burned in, scaled to 640 px wide to keep image tokens low.
-export function annotatedFrames(clipFile: string, layers: Layer[], every: number, fps: number, totalFrames: number): { frame: number; file: string }[] {
+// The chosen frames of the downsampled clip, with each layer's boxes and a time
+// stamp burned in, scaled to 640 px wide to keep image tokens low.
+export function annotatedFrames(clipFile: string, layers: Layer[], frameList: number[], fps: number): { frame: number; file: string }[] {
   const dir = path.join('data/frames', path.parse(clipFile).name);
   fs.mkdirSync(dir, { recursive: true });
   const out: { frame: number; file: string }[] = [];
-  for (let f = 0; f < totalFrames; f += every) {
+  for (const f of frameList) {
     const draws = layers.flatMap((l) => l.hits.filter((h) => h.frame === f).map((h) => {
       const [x1, y1, x2, y2] = h.box;
       return `drawbox=x=${x1}:y=${y1}:w=${x2 - x1}:h=${y2 - y1}:color=${l.color}:t=5,` +
@@ -52,7 +52,8 @@ export async function sparkVerdict(frames: { frame: number; file: string }[], ex
   assertModel(model, { customerData: false });
   const prompt = [
     'You are checking one parcel being packed at a warehouse bench, filmed from above.',
-    `The frames below are in time order, ${fps} frames per second in the source; each is stamped with its frame number and seconds.`,
+    `The frames below are in time order (source ${fps} frames per second); each is stamped with its frame number and seconds.`,
+    'There is roughly one frame per second, with extra consecutive frames around the moments where the detector saw an item appear or vanish. Look closely at those runs: that is usually where an item goes into packaging.',
     'Coloured boxes are object detections from a segmentation model, labelled with what they were prompted for. They can miss objects or mark wrong ones; trust what you see in the image over the boxes.',
     `The barcode scan says the parcel must contain: ${expected.map((e) => `${e.expected} x ${e.phrase}`).join(', ')}.`,
     'Packaging can be nested (for example an item goes into a cloth pouch, the pouch into a box). An item counts as packed if it ends up inside the final closed container, directly or inside inner packaging.',
