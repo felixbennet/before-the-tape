@@ -1,14 +1,15 @@
 // Checks one packing clip against what the scan says should be in the parcel.
 //
-//   pnpm check <clip> --item "belt=1" --item "belt buckle=1" [--parcel "cardboard box"] [--fps 5]
+//   pnpm check <clip> --item "wallet=1" [--item "leather care card=1"] [--parcel "cardboard box"] [--fps 5]
 //
-// SAM 3.1 finds the parcel and tracks each item phrase through the clip; the
-// events are reconciled against the expected counts. Overall result: mismatch
-// if any item disagrees, otherwise uncertain if anything was unclear, otherwise
-// consistent.
+// 1. SAM 3.1 finds the parcel and tracks each item phrase through the clip.
+// 2. A first pass turns SAM's tracks into in / out / uncertain events.
+// 3. Muse Spark reads one frame per second with SAM's boxes drawn on them and
+//    gives the verdict, following nested packaging and citing frames.
 import fs from 'node:fs';
 import { prepareClip, segment } from '../src/sam.js';
-import { packEvents, parcelRegion, verdict, type PackEvent, type Verdict } from '../src/events.js';
+import { packEvents, parcelTrack, verdict, type PackEvent, type Verdict } from '../src/events.js';
+import { annotatedFrames, sparkVerdict, type Layer } from '../src/spark.js';
 
 const args = process.argv.slice(2);
 const clipPath = args[0];
@@ -18,28 +19,36 @@ const items = flag('item').map((s) => {
   return { phrase: phrase.trim(), expected: Number(n) };
 });
 if (!clipPath || !items.length || items.some((i) => !i.phrase || !Number.isInteger(i.expected))) {
-  throw new Error('usage: pnpm check <clip> --item "belt=1" [--item "belt buckle=1"] [--parcel "cardboard box"] [--fps 5]');
+  throw new Error('usage: pnpm check <clip> --item "wallet=1" [--item "leather care card=1"] [--parcel "cardboard box"] [--fps 5]');
 }
 const parcelPhrase = flag('parcel')[0] ?? 'cardboard box';
 const fps = Number(flag('fps')[0] ?? 5);
 
 const clip = prepareClip(clipPath, fps);
-const parcel = parcelRegion(await segment(clip.media, parcelPhrase, clip.frames));
+const parcelHits = await segment(clip.media, parcelPhrase, clip.frames);
+const parcel = parcelTrack(parcelHits);
 if (!parcel) throw new Error(`no "${parcelPhrase}" found in the clip; cannot check what went into it`);
 
-const results: { phrase: string; expected: number; verdict: Verdict; net: number; events: PackEvent[] }[] = [];
-for (const item of items) {
-  const events = packEvents(await segment(clip.media, item.phrase, clip.frames), parcel, { totalFrames: clip.frames });
+const colors = ['green', 'orange', 'magenta', 'cyan'];
+const layers: Layer[] = [{ label: parcelPhrase, color: 'blue', hits: parcelHits }];
+const firstPass: { phrase: string; expected: number; verdict: Verdict; net: number; events: PackEvent[] }[] = [];
+console.log('first pass (SAM tracks only):');
+for (const [i, item] of items.entries()) {
+  const hits = await segment(clip.media, item.phrase, clip.frames);
+  layers.push({ label: item.phrase, color: colors[i % colors.length], hits });
+  const events = packEvents(hits, parcel, { totalFrames: clip.frames });
   const v = verdict(events, item.expected);
-  results.push({ ...item, ...v, events });
-  console.log(`${item.phrase}: expected ${item.expected}, saw net ${v.net} -> ${v.verdict.toUpperCase()}`);
-  for (const e of events) console.log(`  ${(e.frame / fps).toFixed(1)}s  ${e.kind.padEnd(9)} ${e.why}`);
+  firstPass.push({ ...item, ...v, events });
+  console.log(`  ${item.phrase}: expected ${item.expected}, net ${v.net} -> ${v.verdict}`);
 }
 
-const order: Verdict[] = ['mismatch', 'uncertain', 'consistent'];
-const overall = order.find((v) => results.some((r) => r.verdict === v)) ?? 'consistent';
-console.log(`\nPARCEL: ${overall.toUpperCase()}`);
+const frames = annotatedFrames(clip.file, layers, fps, fps, clip.frames);
+const spark = await sparkVerdict(frames, items, fps);
+console.log(`\nMuse Spark (${frames.length} frames): ${spark.summary}`);
+for (const s of spark.steps) console.log(`  ${s.seconds.toFixed(1)}s  frame ${s.frame}  ${s.what}`);
+for (const c of spark.counts) console.log(`  ${c.item}: expected ${c.expected}, seen in ${c.seen_in}`);
+console.log(`\nPARCEL: ${spark.verdict.toUpperCase()}`);
 
 fs.mkdirSync('data/checks', { recursive: true });
 fs.writeFileSync(`data/checks/${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
-  JSON.stringify({ clip: clipPath, fps, frames: clip.frames, parcel, overall, results }, null, 2));
+  JSON.stringify({ clip: clipPath, fps, frames: clip.frames, firstPass, spark }, null, 2));

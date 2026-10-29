@@ -2,7 +2,7 @@
 //   pnpm test
 import assert from 'node:assert/strict';
 import type { Box, Hit } from '../src/sam.js';
-import { packEvents, parcelRegion, verdict } from '../src/events.js';
+import { packEvents, parcelRegion, parcelTrack, verdict } from '../src/events.js';
 
 const parcel: Box = [400, 400, 800, 800];
 // A 60 px item whose center follows the given points, one point per frame.
@@ -33,9 +33,19 @@ assert.equal(run(onRim, 1).verdict, 'uncertain');
 // Two items scanned, only one went in.
 assert.deepEqual(run([...dropIn, ...spare], 2), { verdict: 'mismatch', net: 1 });
 
-// The parcel region ignores one frame where a hand made its box much larger.
+// The parcel region ignores a low-confidence false box and a tiny one.
 const parcelHits: Hit[] = [0, 1, 2, 3, 4].map((f) => ({ frame: f, id: 0, box: [400, 400, 800, 800] as Box, c: 0.9 }));
 parcelHits.push({ frame: 2, id: 1, box: [100, 100, 900, 900], c: 0.5 });
+parcelHits.push({ frame: 3, id: 2, box: [10, 10, 40, 40], c: 0.95 });
 assert.deepEqual(parcelRegion(parcelHits), [400, 400, 800, 800]);
+
+// The parcel moves across the desk: an item dropped into it at its new place still counts.
+const moving: Hit[] = [
+  ...[0, 1, 2].map((f) => ({ frame: f, id: 0, box: [100, 100, 300, 300] as Box, c: 0.9 })),
+  ...[3, 4, 5].map((f) => ({ frame: f, id: 0, box: [600, 100, 800, 300] as Box, c: 0.9 })),
+];
+const track = parcelTrack(moving)!;
+const intoMovedBox = path(5, 0, [[400, 600], [500, 400], [600, 250], [700, 200], [700, 200]]);
+assert.equal(verdict(packEvents(intoMovedBox, track, { totalFrames: 40 }), 1).verdict, 'consistent');
 
 console.log('events: all checks passed');

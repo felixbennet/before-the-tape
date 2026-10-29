@@ -17,8 +17,10 @@ export function prepareClip(src: string, fps = 5): { media: Media; frames: numbe
   const file = path.join('data/tmp', `${path.parse(src).name}-${fps}fps.mp4`);
   execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', src, '-vf', `fps=${fps},scale=-2:720`,
     '-c:v', 'libx264', '-an', '-movflags', '+faststart', file]);
-  const frames = Number(execFileSync('ffprobe', ['-v', 'error', '-count_frames', '-select_streams', 'v:0',
-    '-show_entries', 'stream=nb_read_frames', '-of', 'csv=p=0', file]).toString().trim());
+  // ffprobe can print "100," (a trailing field separator), so parse the leading integer.
+  const frames = parseInt(execFileSync('ffprobe', ['-v', 'error', '-count_frames', '-select_streams', 'v:0',
+    '-show_entries', 'stream=nb_read_frames', '-of', 'csv=p=0', file]).toString(), 10);
+  if (!Number.isFinite(frames) || frames <= 0) throw new Error(`could not count frames in ${file}`);
   return { media: { type: 'input_video', video_url: dataUrl(file, 'video/mp4') }, frames, file };
 }
 

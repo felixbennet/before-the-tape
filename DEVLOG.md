@@ -40,3 +40,25 @@ and run them through `pnpm sam` to decide go or no-go.
   the rim, and one of two scanned items missing.
 - `pnpm check <clip>` runs the whole thing on a clip. It needs real bench
   footage with a parcel in frame to be meaningful.
+
+## Day 3, Thu Oct 29 2026
+
+- First real bench footage: an iPhone looking down at the packing desk.
+  Before anything goes to a model, each clip is trimmed to end before the
+  shipping label appears and cropped to drop paperwork and the screen.
+- What it showed: packers move the box around the desk, and packing is
+  nested (wallet into a cloth pouch, pouch into the box). A fixed parcel
+  region and "did it end inside the box" logic cannot follow that.
+- Changes: the parcel is now tracked per frame with weak or tiny false
+  boxes dropped, and Muse Spark 1.3 now reads one frame per second with
+  SAM's boxes drawn on them and returns a structured verdict with the
+  frame it saw each step on.
+- First run (20 s clip, wallet plus care card): Spark followed the whole
+  sequence, noted where SAM had mislabelled the box lid, saw the pouch go
+  into the box at 15 s and the care card at 17 s, saw nothing taken out,
+  and answered UNCERTAIN because the wallet going into the pouch fell
+  between its sampled frames. That is the behaviour we want: it would
+  rather say "I did not see it" than guess.
+- Also fixed a bug where the frame counter read "100," as not-a-number,
+  which slipped past the spend cap. The cap now refuses any unreadable
+  cost. Spend to date: $0.18.

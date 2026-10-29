@@ -12,17 +12,35 @@ const center = (b: Box) => [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
 const size = (b: Box) => Math.max(b[2] - b[0], b[3] - b[1]);
 const median = (xs: number[]) => xs.sort((a, b) => a - b)[Math.floor(xs.length / 2)];
 
-// The parcel barely moves on a bench: take its largest box on each frame, then
-// the median of each edge, so a hand passing over it does not move the region.
+// Keep only detections that look like the real parcel: confident, and at least a
+// quarter of the size of the biggest parcel box seen (drops small false boxes).
+function parcelHits(hits: Hit[], minConf = 0.6): Hit[] {
+  const sure = hits.filter((h) => Number.isNaN(h.c) || h.c >= minConf);
+  const biggest = Math.max(0, ...sure.map((h) => area(h.box)));
+  return sure.filter((h) => area(h.box) >= biggest / 4);
+}
+
+// A summary region for reports: the median of each edge of the parcel boxes.
 export function parcelRegion(hits: Hit[]): Box | null {
+  const boxes = parcelHits(hits).map((h) => h.box);
+  if (!boxes.length) return null;
+  return [0, 1, 2, 3].map((i) => median(boxes.map((b) => b[i]))) as Box;
+}
+
+// Packers move the box around, so the parcel is looked up per frame: its
+// largest kept box on that frame, else the nearest frame that has one.
+export function parcelTrack(hits: Hit[]): ((frame: number) => Box | null) | null {
   const byFrame = new Map<number, Box>();
-  for (const h of hits) {
+  for (const h of parcelHits(hits)) {
     const cur = byFrame.get(h.frame);
     if (!cur || area(h.box) > area(cur)) byFrame.set(h.frame, h.box);
   }
-  const boxes = [...byFrame.values()];
-  if (!boxes.length) return null;
-  return [0, 1, 2, 3].map((i) => median(boxes.map((b) => b[i]))) as Box;
+  const frames = [...byFrame.keys()].sort((a, b) => a - b);
+  if (!frames.length) return null;
+  return (frame) => {
+    const nearest = frames.reduce((best, f) => (Math.abs(f - frame) < Math.abs(best - frame) ? f : best), frames[0]);
+    return byFrame.get(nearest) ?? null;
+  };
 }
 
 // The edge band (a fraction of the parcel size on each side) is where the
@@ -59,11 +77,15 @@ function tracks(hits: Hit[], gap: number): Hit[][] {
   return merged;
 }
 
-export function packEvents(itemHits: Hit[], parcel: Box, opts: { totalFrames: number; band?: number; gap?: number; settle?: number }): PackEvent[] {
+export function packEvents(itemHits: Hit[], parcel: Box | ((frame: number) => Box | null), opts: { totalFrames: number; band?: number; gap?: number; settle?: number }): PackEvent[] {
   const { totalFrames, band = 0.1, gap = 4, settle = 3 } = opts;
+  const parcelAt = typeof parcel === 'function' ? parcel : () => parcel;
   const events: PackEvent[] = [];
   for (const t of tracks(itemHits, gap)) {
-    const zones = t.map((h) => zone(h.box, parcel, band));
+    const zones = t.map((h) => {
+      const p = parcelAt(h.frame);
+      return p ? zone(h.box, p, band) : 'outside';
+    });
     const lastInside = zones.lastIndexOf('inside');
     const last = t.at(-1)!;
     const endsAtClipEnd = last.frame >= totalFrames - 1;

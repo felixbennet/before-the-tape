@@ -29,12 +29,16 @@ const LEDGER = 'data/spend.json';
 const CAP_USD = Number(process.env.SPEND_CAP_USD ?? 120);
 
 function spent(): number {
-  return fs.existsSync(LEDGER) ? JSON.parse(fs.readFileSync(LEDGER, 'utf8')).usd : 0;
+  if (!fs.existsSync(LEDGER)) return 0;
+  const usd = JSON.parse(fs.readFileSync(LEDGER, 'utf8')).usd;
+  if (!Number.isFinite(usd)) throw new Error(`${LEDGER} is unreadable; fix it before spending more`);
+  return usd;
 }
 
 // ponytail: one local ledger file, single process; move to a DB row once the bench runs unattended.
 export function spend<T>(estimateUsd: number, label: string, call: () => Promise<T>): Promise<T> {
   const before = spent();
+  if (!Number.isFinite(estimateUsd) || estimateUsd < 0) throw new Error(`refusing ${label}: bad cost estimate ${estimateUsd}`);
   if (before + estimateUsd > CAP_USD) {
     throw new Error(`spend cap: $${before.toFixed(4)} spent + $${estimateUsd.toFixed(4)} would pass $${CAP_USD}`);
   }
