@@ -91,3 +91,50 @@ and run them through `pnpm sam` to decide go or no-go.
 - Also fixed a bug where the frame counter read "100," as not-a-number,
   which slipped past the spend cap. The cap now refuses any unreadable
   cost. Spend to date: $0.72.
+
+### Day 3, later: is it the right product?
+
+- A scan proves which product was meant; "a wallet went in" does not prove
+  it was that one. Same model, different colour is the mistake that
+  actually happens. So Muse Spark now gets the catalogue photo of the
+  scanned variant mixed in with photos of look-alike variants, shuffled and
+  unlabelled, and has to say which one was packed (or that it cannot tell).
+  Picking from a line-up resists the "yes, looks like it" bias of a
+  yes/no question.
+- Asked for an outside review (GPT-6 Astra and Claude Opus). Both said the
+  same three things, all now done: let the code, not the model, decide the
+  verdict from what the model reports (cited frames must be ones it was
+  shown, counts must match, the right photo must be picked); stop the 1 fps
+  frames eating the whole frame budget on long clips; give the identity
+  check a close-up instead of a small 640 px frame. Also from the review:
+  boxes are drawn with neutral tags (A, B) so a mislabelled box does not
+  tell Spark what it is looking at, and SAM runs once per clip and phrase
+  and is reused across test variants.
+- Test set: two real packs of the same wallet model in two different
+  variants (one burgundy smooth, one brown distressed). Each was checked
+  against its true catalogue photo and against a wrong one. "Hard" line-ups
+  hold four photos, three of them near-identical burgundy variants (Spark,
+  shown each photo alone, described all three almost word for word the
+  same). "Distinct" line-ups hold three clearly different colours.
+
+  | Run | Scanned photo | Line-up | Without close-ups | With close-ups | Correct |
+  |---|---|---|---|---|---|
+  | burgundy pack | true | hard | MISMATCH (picked a sibling) | UNCERTAIN | consistent |
+  | burgundy pack | wrong (brown) | hard | UNCERTAIN | MISMATCH, picked the true photo | mismatch |
+  | brown pack | true | hard | UNCERTAIN | CONSISTENT | consistent |
+  | brown pack | wrong (burgundy) | hard | UNCERTAIN | MISMATCH, picked the true photo | mismatch |
+  | burgundy pack | true | distinct | | CONSISTENT | consistent |
+  | brown pack | wrong (green) | distinct | | MISMATCH, picked the true photo | mismatch |
+
+  With close-ups: 5 right, 1 uncertain, 0 wrong. Every time it named a
+  photo it named the true product. Without close-ups it mostly could not
+  tell and once picked a near-identical sibling, a confident wrong answer;
+  that is the failure the close-ups fixed here.
+- Packing itself, rerun with the new frame picker and tags: maroon-wallet
+  pack with no photo CONSISTENT, same pack with a wrong scan of two
+  wallets MISMATCH ("only 1 wallet ever entered packaging").
+- Honest size of this: two independent packing scenes, multiplied into
+  variants. It shows the method works, not an accuracy rate. Next: more
+  clips, ground truth written down before running, prompts frozen, and
+  the confusion table reported with the uncertain rate.
+- Spend to date: $1.90.

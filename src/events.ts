@@ -84,14 +84,37 @@ export function trackEdges(itemHits: Hit[], totalFrames: number, gap = 4): numbe
   return [...new Set(edges)].filter((f) => f > 0 && f < totalFrames - 1).sort((a, b) => a - b);
 }
 
+// The clearest views of the item that was handled, for the variant check: the
+// track that moved furthest (spare stock lies still), its biggest confident
+// boxes, at least `apart` frames apart, before its last frames (going into a pouch).
+export function closeups(itemHits: Hit[], n = 2, apart = 5, gap = 4): Hit[] {
+  const travel = (t: Hit[]) => Math.max(...t.map((h) => Math.hypot(center(h.box)[0] - center(t[0].box)[0], center(h.box)[1] - center(t[0].box)[1])));
+  const handled = tracks(itemHits.filter((h) => Number.isNaN(h.c) || h.c >= 0.6), gap).sort((a, b) => travel(b) - travel(a))[0];
+  if (!handled) return [];
+  const best = handled.slice(0, Math.max(1, handled.length - 3)).sort((a, b) => area(b.box) * (b.c || 1) - area(a.box) * (a.c || 1));
+  const out: Hit[] = [];
+  for (const h of best) if (out.length < n && out.every((o) => Math.abs(o.frame - h.frame) >= apart)) out.push(h);
+  return out;
+}
+
 // Which frames Muse Spark sees: one per second, plus every frame within `window`
 // of a track edge, capped to keep cost down.
 export function pickFrames(totalFrames: number, fps: number, edges: number[], window = 3, cap = 45): number[] {
-  const picked = new Set<number>();
-  for (let f = 0; f < totalFrames; f += fps) picked.add(f);
-  for (const e of edges) {
-    for (let f = e - window; f <= e + window; f++) {
-      if (f >= 0 && f < totalFrames && picked.size < cap) picked.add(f);
+  const step = Math.max(1, Math.round(fps));
+  let base: number[] = [];
+  for (let f = 0; f < totalFrames; f += step) base.push(f);
+  if (base.at(-1) !== totalFrames - 1) base.push(totalFrames - 1);
+  // Long clips: thin the 1 fps frames so half the budget is left for the edges.
+  const keep = Math.floor(cap / 2);
+  if (base.length > keep) base = Array.from({ length: keep }, (_, i) => base[Math.round((i * (base.length - 1)) / (keep - 1))]);
+  const picked = new Set(base);
+  // Share the rest across edges: every edge frame first, then +-1, +-2, ...
+  const sorted = [...edges].sort((a, b) => a - b);
+  for (let d = 0; d <= window; d++) {
+    for (const e of sorted) {
+      for (const f of d ? [e - d, e + d] : [e]) {
+        if (f >= 0 && f < totalFrames && picked.size < cap) picked.add(f);
+      }
     }
   }
   return [...picked].sort((a, b) => a - b);

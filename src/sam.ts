@@ -36,7 +36,7 @@ export function samCost(frames: number | null) {
 // One line per frame: <Nf>id<|box;x1=..;y1=..;x2=..;y2=..;w=..;h=..;c=..|><|mask;...|>,id<|box...
 export function parseHits(text: string): Hit[] {
   const hits: Hit[] = [];
-  for (const line of text.split('\n')) {
+  for (const line of text.split(/(?=<\d+f>)/)) {
     const frame = line.match(/^<(\d+)f>/);
     if (!frame) continue;
     for (const m of line.matchAll(/(\d+)<\|box;x1=(\d+);y1=(\d+);x2=(\d+);y2=(\d+);w=\d+;h=\d+(?:;c=([\d.]+))?\|>/g)) {
@@ -57,7 +57,7 @@ export async function segment(media: Media, phrase: string, frames: number | nul
       metadata: { mask_encoding: 'one_bit', include_confidence: 'true' },
     });
     let out = '';
-    for await (const event of stream) if (event.type === 'response.output_text.delta') out += event.delta + '\n';
+    for await (const event of stream) if (event.type === 'response.output_text.delta') out += event.delta;
     return out;
   });
   fs.mkdirSync('data/runs', { recursive: true });

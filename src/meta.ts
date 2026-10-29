@@ -44,7 +44,8 @@ export function spend<T>(estimateUsd: number, label: string, call: () => Promise
   }
   return call().then((result) => {
     fs.mkdirSync('data', { recursive: true });
-    fs.writeFileSync(LEDGER, JSON.stringify({ usd: before + estimateUsd, last: label, at: new Date().toISOString() }));
+    // Re-read: other calls may have finished while this one ran.
+    fs.writeFileSync(LEDGER, JSON.stringify({ usd: spent() + estimateUsd, last: label, at: new Date().toISOString() }));
     return result;
   });
 }
