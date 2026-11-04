@@ -204,4 +204,4 @@ and run them through `pnpm sam` to decide go or no-go.
   cuts); SAM followed the handled wallet frame 11 to 54; "cream drawstring
   pouch" tracked with 0 missing frames until inside the box at frame 87
   ("cloth pouch" found nothing; appearance words again). Proof JPEG 169 KB.
-- Spend to date: $2.76.
+- Spend to date: $2.78.
