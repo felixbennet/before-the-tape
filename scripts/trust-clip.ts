@@ -21,7 +21,7 @@ const runPath = opt('follow-run');
 const out = opt('out');
 if (!clipPath || !receiptPath || !runPath || !out) throw new Error('usage: trust-clip.ts <clip> <receipt.json> --follow-run <run.txt> --out <out.mp4>');
 
-const fps = 5; // SAM frame k = time k/5 s
+const fps = 5; // SAM frame k is about time k/5 s (see samLag)
 const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
 const { followedFrom, lastSeen, containerInParcelAt, container } = receipt.custody as
   { followedFrom: number; lastSeen: number; containerInParcelAt: number; container: string };
@@ -34,6 +34,10 @@ const probe = (file: string, entries: string) =>
   execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', entries, '-of', 'csv=p=0', file]).toString().trim();
 const [W, H] = probe(clipPath, 'stream=width,height').split(',').map(Number);
 const clipSeconds = Number(probe(clipPath, 'format=duration').split(',')[0]);
+// ffmpeg's fps=5 (round=near) keeps the LAST source frame of each 0.2 s slot, so SAM frame k
+// shows source time k/5 + 0.1 s minus one source frame. Without this the mask runs ahead of the item.
+const [num, den] = probe(clipPath, 'stream=r_frame_rate').split('/').map(Number);
+const samLag = 1 / (2 * fps) - (den || 1) / num;
 
 // --- 1. Timings: 1 s before the first clear hold to 1.5 s after the container is in the box, max 9 s.
 const MAX = 9, KEEP = 2; // seconds kept at real speed at each end
@@ -98,7 +102,7 @@ const frameFiles = picks.map((k) => {
   const cx = ((x1 + x2) / 2) * sx, cy = ((y1 + y2) / 2) * sy;
   const cx0 = Math.round(Math.min(Math.max(0, cx - side / 2), W - side)), cy0 = Math.round(Math.min(Math.max(0, cy - side / 2), H - side));
   const file = `${tmpDir}/item-f${k}.jpg`;
-  execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', String(k / fps), '-i', clipPath, '-frames:v', '1', '-vf', `crop=${side}:${side}:${cx0}:${cy0},scale=512:512`, '-q:v', '3', file]);
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', (k / fps + samLag).toFixed(3), '-i', clipPath, '-frames:v', '1', '-vf', `crop=${side}:${side}:${cx0}:${cy0},scale=512:512`, '-q:v', '3', file]);
   return file;
 });
 
@@ -109,8 +113,8 @@ async function writeCaption(): Promise<Caption> {
   const packed = [container, 'gift box', ...(receipt.scan as string[]).filter((s) => /card/.test(s)).map(() => 'care card')];
   const prompt = [
     `These are close-ups of one ${receipt.scan[0].replace(/^\d+ x /, '')} from our packing bench camera, filmed from above while it was being packed for a customer's order.`,
-    `It was then packed with: ${packed.map((p) => `a ${p}`).join(', ')}.`,
-    'Write caption: one warm, factual, grammatical sentence to the customer, starting with "We", about what we checked (its colour and finish, as you see them in these frames) and what it was packed with, naming each packing item above with its article.',
+    `It was then packed into: ${packed.join(', ')}.`,
+    'Write caption: one warm, factual sentence to the customer about what we checked (its colour and finish, as you see them in these frames) and what it was packed in.',
     'Under 18 words. No promises, no brand names, no dashes, no emoji. Plain words a shopper in India would use.',
   ].join('\n');
   const estimate = (frameFiles.length * 1000 + 1500) * PRICE.sparkIn + 1500 * PRICE.sparkOut;
@@ -164,7 +168,7 @@ const panX = centres.map((_, i) => {
 });
 // Piecewise-linear x(t) as a sum of one-frame pieces (no deep if() nesting for ffmpeg's parser).
 const panExpr = panX.slice(0, -1).map((x, i) => {
-  const t0 = (k0 + i) / fps;
+  const t0 = +((k0 + i) / fps + samLag).toFixed(4);
   return `gte(t,${t0})*lt(t,${t0 + 1 / fps})*(${x.toFixed(1)}+${((panX[i + 1] - x) * fps).toFixed(2)}*(t-${t0}))`;
 }).join('+');
 
@@ -179,7 +183,7 @@ const segFilters = segments.map((s, i) =>
   `[s${i}]trim=start=${s.from.toFixed(3)}:end=${s.to.toFixed(3)},setpts=(PTS-STARTPTS)/${s.speed.toFixed(4)}[g${i}]`);
 const filter = [
   // Mask stream: top half = darkening, bottom half = outline, one 5 fps frame per SAM frame.
-  `[1:v]split[mt][mb]`,
+  `[1:v]setpts=PTS+${samLag.toFixed(4)}/TB,split[mt][mb]`,
   `[mt]crop=${sw}:${sh}:0:0,gblur=sigma=5,scale=${W}:${H}:flags=bilinear,framerate=fps=60:scene=100[dark]`,
   `[mb]crop=${sw}:${sh}:0:${sh},gblur=sigma=0.8,scale=${W}:${H}:flags=bilinear,framerate=fps=60:scene=100[line]`,
   `color=black:s=${W}x${H}:r=60[k]`, `color=0xFFB547:s=${W}x${H}:r=60[warm]`,
