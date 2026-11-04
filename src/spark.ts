@@ -14,7 +14,9 @@ export type Layer = { label: string; color: string; hits: Hit[] };
 export type SparkStep = { frame: number; seconds: number; what: string };
 export type Identity = 'yes' | 'no' | 'unclear' | 'no_reference';
 export type SparkCount = { item: string; expected: number; seen_in: number; reference_pick: number; reference_note: string };
-export type SparkRaw = { verdict: Verdict; summary: string; steps: SparkStep[]; counts: SparkCount[] };
+// Evidence Spark asks for when the frames it has do not settle a step.
+export type Need = { kind: 'frames' | 'closeup'; from_frame: number; to_frame: number; reason: string };
+export type SparkRaw = { verdict: Verdict; summary: string; steps: SparkStep[]; counts: SparkCount[]; need: Need[] };
 export type SparkResult = SparkRaw & { spark_verdict: Verdict; why: string[]; identity: Identity[] };
 
 // Boxes carry a neutral tag (A, B, ...) instead of the prompt phrase, so a
@@ -65,8 +67,10 @@ export function crops(srcFile: string, hits: Hit[], fps: number): string[] {
 const SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['verdict', 'summary', 'steps', 'counts'],
+  required: ['verdict', 'summary', 'steps', 'counts', 'need'],
   properties: {
+    need: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['kind', 'from_frame', 'to_frame', 'reason'],
+      properties: { kind: { type: 'string', enum: ['frames', 'closeup'] }, from_frame: { type: 'integer' }, to_frame: { type: 'integer' }, reason: { type: 'string' } } } },
     verdict: { type: 'string', enum: ['consistent', 'mismatch', 'uncertain'] },
     summary: { type: 'string' },
     steps: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['frame', 'seconds', 'what'],
@@ -108,6 +112,7 @@ export function decide(raw: SparkRaw, expected: Expected[], candidates: (Candida
   const steps = raw.steps.map((s) => ({ ...s, seconds: s.frame / fps }));
   for (const s of steps) if (!sent.includes(s.frame)) why.push(`cited frame ${s.frame}, which it was never shown`);
   if (raw.counts.length !== expected.length) why.push(`gave ${raw.counts.length} counts for ${expected.length} scanned items`);
+  if (raw.need?.length) why.push(`asked for more evidence: ${raw.need.map((n) => n.reason).join('; ')}`);
   const identity = expected.map((_, i): Identity => {
     const c = raw.counts[i], cand = candidates[i];
     if (!cand) return 'no_reference';
@@ -131,14 +136,29 @@ export function decide(raw: SparkRaw, expected: Expected[], candidates: (Candida
   return { ...raw, steps, verdict, spark_verdict: raw.verdict, why, identity };
 }
 
-export async function sparkVerdict(frames: { frame: number; file: string }[], expected: Expected[], detectors: string[], fps: number): Promise<SparkResult & { candidates: (Candidates | null)[] }> {
+// Agent mode: Spark starts from sparse frames plus SAM's track events as text,
+// and may ask for the frames or close-ups it needs. Rounds keep the same candidates.
+export type AgentContext = { round: number; totalFrames: number; samEvents: string[]; asked: string[]; candidates?: (Candidates | null)[] };
+
+export async function sparkVerdict(frames: { frame: number; file: string }[], expected: Expected[], detectors: string[], fps: number, agent?: AgentContext): Promise<SparkResult & { candidates: (Candidates | null)[] }> {
   const model = 'muse-spark-1.3';
   assertModel(model, { customerData: false });
-  const candidates = expected.map((e) => shuffleCandidates(e));
+  const candidates = agent?.candidates ?? expected.map((e) => shuffleCandidates(e));
+  const sampling = agent
+    ? [
+        `This is round ${agent.round} of an investigation. You were sent about one frame per second, plus any frames you asked for in earlier rounds. The clip has ${agent.totalFrames} frames (0 to ${agent.totalFrames - 1}).`,
+        `The segmentation model's track events, as hints of where things happen: ${agent.samEvents.join('; ') || 'none'}.`,
+        ...(agent.asked.length ? [`In earlier rounds you asked for: ${agent.asked.join('; ')}. Those frames are now included.`] : []),
+        'need: if a step you must verify (above all an item going into packaging, or being taken out) happened between frames you were shown, or you cannot tell which candidate photo matches, ask for evidence. kind "frames" with a frame range to see every frame in it (at most 15 frames), or kind "closeup" with the frame range where the item is held clearest. Give the reason. Leave need empty when the frames already settle it. Your verdict this round must reflect only what you have actually seen; if a link is missing, say uncertain and ask.',
+      ]
+    : [
+        'There is roughly one frame per second, with extra consecutive frames around the moments where the detector saw an item appear or vanish. Look closely at those runs: that is usually where an item goes into packaging.',
+        'need: leave it empty.',
+      ];
   const prompt = [
     'You are checking one parcel being packed at a warehouse bench, filmed from above.',
     `The frames below are in time order (source ${fps} frames per second); each is stamped with its frame number and seconds.`,
-    'There is roughly one frame per second, with extra consecutive frames around the moments where the detector saw an item appear or vanish. Look closely at those runs: that is usually where an item goes into packaging.',
+    ...sampling,
     `Coloured boxes are object detections from a segmentation model, tagged by what it was asked to find: ${detectors.map((d, i) => `${tag(i)} = "${d}"`).join(', ')}. They can miss objects or mark wrong ones; trust what you see in the image over the boxes.`,
     `The barcode scan says the parcel must contain: ${expected.map((e) => `${e.expected} x ${e.phrase}`).join(', ')}.`,
     'Packaging can be nested (for example an item goes into a cloth pouch, the pouch into a box). An item counts as packed if it ends up inside the final closed container, directly or inside inner packaging.',

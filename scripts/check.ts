@@ -9,8 +9,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { prepareClip, segment, type Hit } from '../src/sam.js';
-import { closeups, packEvents, parcelTrack, pickFrames, trackEdges, verdict, type PackEvent, type Verdict } from '../src/events.js';
-import { annotatedFrames, crops, sparkVerdict, type Expected, type Layer } from '../src/spark.js';
+import { closeups, framesFor, packEvents, parcelTrack, pickFrames, trackEdges, trackEvents, verdict, type PackEvent, type Verdict } from '../src/events.js';
+import { annotatedFrames, crops, sparkVerdict, type AgentContext, type Expected, type Layer, type Need } from '../src/spark.js';
 
 const args = process.argv.slice(2);
 const clipPath = args[0];
@@ -72,10 +72,48 @@ for (const [i, item] of items.entries()) {
   console.log(`  ${item.phrase}: expected ${item.expected}, net ${v.net} -> ${v.verdict}`);
 }
 
-const edges = layers.slice(1).flatMap((l) => trackEdges(l.hits, clip.frames));
-const frames = annotatedFrames(clip.file, layers, pickFrames(clip.frames, fps, edges), fps);
-for (const [i, item] of items.entries()) if (item.image) item.closeups = crops(clipPath, closeups(itemHits[i]), fps);
-const spark = await sparkVerdict(frames, items, layers.map((l) => l.label), fps);
+const detectors = layers.map((l) => l.label);
+const rounds: { round: number; sent: number; added: number[]; closeups: number; need: Need[]; spark_verdict: Verdict; verdict: Verdict; summary: string }[] = [];
+let spark: Awaited<ReturnType<typeof sparkVerdict>>;
+let frames: { frame: number; file: string }[];
+if (!args.includes('--agent')) {
+  const edges = layers.slice(1).flatMap((l) => trackEdges(l.hits, clip.frames));
+  frames = annotatedFrames(clip.file, layers, pickFrames(clip.frames, fps, edges), fps);
+  for (const [i, item] of items.entries()) if (item.image) item.closeups = crops(clipPath, closeups(itemHits[i]), fps);
+  spark = await sparkVerdict(frames, items, detectors, fps);
+} else {
+  // Agent mode: start from one frame per second and SAM's track events as text;
+  // Muse Spark asks for the frames or close-ups it needs, up to 3 rounds.
+  const samEvents = layers.flatMap((l) => trackEvents(l.label, l.hits, clip.frames));
+  frames = annotatedFrames(clip.file, layers, pickFrames(clip.frames, fps, []), fps);
+  for (const [i, item] of items.entries()) if (item.image) item.closeups = crops(clipPath, closeups(itemHits[i], 1), fps);
+  const asked: string[] = [];
+  let candidates: AgentContext['candidates'];
+  let added: number[] = [];
+  let addedCloseups = 0;
+  for (let round = 1; ; round++) {
+    spark = await sparkVerdict(frames, items, detectors, fps, { round, totalFrames: clip.frames, samEvents, asked, candidates });
+    candidates = spark.candidates;
+    rounds.push({ round, sent: frames.length, added, closeups: addedCloseups, need: spark.need, spark_verdict: spark.spark_verdict, verdict: spark.verdict, summary: spark.summary });
+    console.log(`round ${round}: ${frames.length} frames -> ${spark.verdict.toUpperCase()}${spark.need.map((n) => `\n  asks for ${n.kind} ${n.from_frame}-${n.to_frame}: ${n.reason}`).join('')}`);
+    if (!spark.need.length || round === 3) break;
+    added = [];
+    addedCloseups = 0;
+    for (const n of spark.need) {
+      if (n.kind === 'frames') added.push(...framesFor(n, clip.frames, [...frames.map((f) => f.frame), ...added]));
+      else for (const [i, item] of items.entries()) {
+        if (!item.image) continue;
+        const inRange = itemHits[i].filter((h) => h.frame >= Math.min(n.from_frame, n.to_frame) && h.frame <= Math.max(n.from_frame, n.to_frame));
+        const more = crops(clipPath, closeups(inRange, 2, 3), fps).filter((f) => !(item.closeups ?? []).includes(f));
+        item.closeups = [...(item.closeups ?? []), ...more].slice(0, 4);
+        addedCloseups += more.length;
+      }
+      asked.push(`${n.kind} ${n.from_frame}-${n.to_frame} (${n.reason})`);
+    }
+    if (!added.length && !addedCloseups) break;
+    frames = [...frames, ...annotatedFrames(clip.file, layers, added, fps)].sort((a, b) => a.frame - b.frame);
+  }
+}
 console.log(`\nMuse Spark (${frames.length} frames): ${spark.summary}`);
 for (const s of spark.steps) console.log(`  ${s.seconds.toFixed(1)}s  frame ${s.frame}  ${s.what}`);
 for (const [i, c] of spark.counts.entries()) {
@@ -87,4 +125,4 @@ console.log(`\nPARCEL: ${spark.verdict.toUpperCase()}${spark.verdict !== spark.s
 
 fs.mkdirSync('data/checks', { recursive: true });
 fs.writeFileSync(`data/checks/${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
-  JSON.stringify({ clip: clipPath, fps, frames: clip.frames, firstPass, spark }, null, 2));
+  JSON.stringify({ clip: clipPath, fps, frames: clip.frames, firstPass, rounds, spark }, null, 2));

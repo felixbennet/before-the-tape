@@ -84,6 +84,24 @@ export function trackEdges(itemHits: Hit[], totalFrames: number, gap = 4): numbe
   return [...new Set(edges)].filter((f) => f > 0 && f < totalFrames - 1).sort((a, b) => a - b);
 }
 
+// The frames an agent request asks for, clamped to the clip, minus frames
+// already sent, evenly thinned to at most `cap`.
+export function framesFor(need: { from_frame: number; to_frame: number }, totalFrames: number, sent: number[], cap = 15): number[] {
+  const a = Math.max(0, Math.min(need.from_frame, need.to_frame)), b = Math.min(totalFrames - 1, Math.max(need.from_frame, need.to_frame));
+  const fresh: number[] = [];
+  for (let f = a; f <= b; f++) if (!sent.includes(f)) fresh.push(f);
+  if (fresh.length <= cap) return fresh;
+  return Array.from({ length: cap }, (_, i) => fresh[Math.round((i * (fresh.length - 1)) / (cap - 1))]);
+}
+
+// SAM's track starts and ends, as text hints for the agent.
+export function trackEvents(label: string, itemHits: Hit[], totalFrames: number, gap = 4): string[] {
+  return tracks(itemHits, gap).flatMap((t) => [
+    ...(t[0].frame > 0 ? [`${label} appears at frame ${t[0].frame}`] : []),
+    ...(t.at(-1)!.frame < totalFrames - 1 ? [`${label} disappears after frame ${t.at(-1)!.frame}`] : []),
+  ]);
+}
+
 // The clearest views of the item that was handled, for the variant check: the
 // track that moved furthest (spare stock lies still), its biggest confident
 // boxes, at least `apart` frames apart, before its last frames (going into a pouch).

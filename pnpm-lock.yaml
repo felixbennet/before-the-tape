@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@meta-sam/parser':
+        specifier: ^0.1.0
+        version: 0.1.0
       openai:
         specifier: ^7.0.0
         version: 7.43.0
@@ -180,6 +183,10 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@meta-sam/parser@0.1.0':
+    resolution: {integrity: sha512-099xq4EhULxm7gV+kEllQ9WTaNgwYumGRvCX5WAT2bny/SEh+U9tVT9bAzN1mISOC7TO6mgOt3MJmZ2Mv2RTmw==}
+    engines: {node: ^20.17.0 || >=22.9.0}
+
   '@types/node@24.19.2':
     resolution: {integrity: sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==}
 
@@ -312,6 +319,8 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.2':
     optional: true
+
+  '@meta-sam/parser@0.1.0': {}
 
   '@types/node@24.19.2':
     dependencies:

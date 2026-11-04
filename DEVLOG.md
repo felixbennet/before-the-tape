@@ -172,3 +172,22 @@ and run them through `pnpm sam` to decide go or no-go.
   instead of "never guesses", and the wrong-scan test labelled as a
   controlled test.
 - Spend to date: $1.99.
+
+### Day 9, later: an agent loop and real masks
+
+- Outside reviews (GPT-6 Astra, Gemini 4 Argon, Claude Opus) all said the
+  same thing: it looked like a fixed pipeline that draws boxes. Two changes.
+- Agent mode (`--agent`): Muse Spark starts from one frame per second plus
+  SAM's track events as text, and asks for the frames or close-ups it needs.
+  Results, all three runs that began uncertain:
+
+  | Clip | Scan | Round 1 | Asked for | Final | Correct |
+  |---|---|---|---|---|---|
+  | bench-02 | 1 wallet, 1 card | UNCERTAIN (21 frames) | frames 46-60, "need to see wallet being inserted into pouch" | CONSISTENT (33 frames), wallet into pouch at frame 53 | consistent |
+  | bench-05 | Rugged Brown (true) | UNCERTAIN (22 frames) | four frame ranges around each transfer | CONSISTENT, picked the scanned photo | consistent |
+  | bench-05 | Cherry Blend (wrong on purpose) | UNCERTAIN (22 frames) | three frame ranges and a close-up | MISMATCH, picked the brown wallet really packed | mismatch |
+
+- SAM masks: the one-bit masks SAM 3.1 already returned are now decoded
+  with Meta's `@meta-sam/parser` and painted onto the clips
+  (`scripts/render-masks.ts`), from the saved runs, no new calls.
+- Spend to date: $2.50.

@@ -2,7 +2,7 @@
 //   pnpm test
 import assert from 'node:assert/strict';
 import type { Box, Hit } from '../src/sam.js';
-import { closeups, packEvents, parcelRegion, parcelTrack, pickFrames, trackEdges, verdict } from '../src/events.js';
+import { closeups, framesFor, packEvents, parcelRegion, parcelTrack, pickFrames, trackEdges, verdict } from '../src/events.js';
 import { parseHits } from '../src/sam.js';
 import { decide, shuffleCandidates, type Expected, type SparkRaw } from '../src/spark.js';
 
@@ -78,7 +78,7 @@ const wallet: Expected = { phrase: 'wallet', expected: 1, image: 'scanned.jpg', 
 const cand = { photos: ['lookalike.jpg', 'scanned.jpg'], answer: 2 };
 const raw = (over: Partial<SparkRaw> = {}, pick = 2, seen = 1): SparkRaw => ({
   verdict: 'consistent', summary: '', steps: [{ frame: 10, seconds: 99, what: 'into pouch' }],
-  counts: [{ item: 'wallet', expected: 1, seen_in: seen, reference_pick: pick, reference_note: '' }], ...over,
+  counts: [{ item: 'wallet', expected: 1, seen_in: seen, reference_pick: pick, reference_note: '' }], need: [], ...over,
 });
 const d = (r: SparkRaw) => decide(r, [wallet], [cand], [0, 5, 10], 5);
 assert.equal(d(raw()).verdict, 'consistent');
@@ -92,5 +92,11 @@ assert.equal(d(raw({ verdict: 'mismatch' }, 2, 0)).verdict, 'mismatch');
 assert.equal(d(raw({ verdict: 'mismatch' })).verdict, 'uncertain');
 assert.equal(decide(raw({}, 0), [{ phrase: 'wallet', expected: 1 }], [null], [10], 5).verdict, 'consistent');
 assert.equal(shuffleCandidates(wallet, () => 0)!.answer, 2);
+// Asking for more evidence is never a pass.
+assert.equal(d(raw({ need: [{ kind: 'frames', from_frame: 30, to_frame: 44, reason: 'wallet into pouch not seen' }] })).verdict, 'uncertain');
+// The agent's frame requests are clamped and capped.
+assert.deepEqual(framesFor({ from_frame: -5, to_frame: 3 }, 100, []), [0, 1, 2, 3]);
+assert.equal(framesFor({ from_frame: 0, to_frame: 99 }, 100, []).length, 15);
+assert.deepEqual(framesFor({ from_frame: 6, to_frame: 4 }, 100, [5]), [4, 6]);
 
 console.log('events: all checks passed');

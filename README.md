@@ -37,8 +37,21 @@ pnpm smoke                        # free: checks the key and model access
 pnpm sam <image|clip|url> "belt buckle"
 pnpm check <clip> --item "wallet=1" --item "white printed card=1" \
   --ref "wallet=<catalogue photo>|<product>" --decoy "wallet=<look-alike photo>"
+pnpm check <clip> ... --agent     # Muse Spark asks for the frames or close-ups it needs
+pnpm exec tsx scripts/render-masks.ts <clip> out.mp4 "cardboard box" "wallet"   # SAM masks on the clip
 pnpm test                         # decision logic, no API calls
 ```
+
+## Agent mode: it asks instead of guessing
+
+With `--agent`, Muse Spark starts from one frame per second plus SAM's track
+events as text ("wallet disappears after frame 45"). If a step it must verify
+happened between the frames it has, it answers uncertain and asks for
+evidence: every frame in a range, or a full-resolution close-up of the item.
+The code fetches exactly that (clamped, at most 15 frames a request, up to 3
+rounds) and asks again. On bench-02, round 1 could not see the wallet go into
+the pouch and asked for frames 46 to 60; round 2 saw it at frame 53 and the
+check passed. A request for more evidence is never a pass.
 
 ## How the check decides
 
