@@ -206,7 +206,7 @@ and run them through `pnpm sam` to decide go or no-go.
   ("cloth pouch" found nothing; appearance words again). Proof JPEG 169 KB.
 - Spend to date: $2.78.
 
-### Day 9, late night: live pause and returns bench
+### Day 9, later: live pause and returns bench
 
 - Live pause (`pnpm live`): the scan triggers a small Muse Spark call (2
   frames from the second before the scan, the shuffled line-up, low
@@ -228,7 +228,7 @@ and run them through `pnpm sam` to decide go or no-go.
   clips; real returns footage is next.
 - Spend to date: $2.93.
 
-### Day 10, small hours: more brains, four more features
+### Day 10, Thu Nov 5 2026: four more features from outside ideas
 
 - Asked seven models for ideas (GPT-6 Astra, Gemini 4 Argon, DeepSeek V4
   Pro, Qwen 3.8 Max, GLM 5.3, MiniMax M3, with Claude Opus), plus a third
