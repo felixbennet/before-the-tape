@@ -42,6 +42,10 @@ pnpm check <clip> ... --agent     # Muse Spark asks for the frames, close-ups or
 pnpm receipt <clip> <check.json> --container "cream drawstring pouch"   # custody receipt + proof JPEG
 pnpm live <clip> --scan-at 4.0 --seal-at 21.8 --ref "<photo>|<product>" --decoy <photo>   # live pause
 pnpm returns <outbound clip> --returned <photo> --returned <photo>   # returns bench
+pnpm verify <clip> --receipt data/receipts/<clip>.json   # is this the untouched recorded take?
+pnpm appeal data/receipts/<clip>.json --claim "<claim text>"   # point-by-point claim reply
+pnpm exec tsx scripts/voice-scan.ts <voice note>   # Hinglish voice note -> scan list (Muse Voice Transcribe)
+pnpm exec tsx scripts/trust-clip.ts <clip> <receipt.json> --follow-run <run> --out <mp4>   # "packed for you" clip
 pnpm exec tsx scripts/render-masks.ts <clip> out.mp4 "cardboard box" "wallet"   # SAM masks on the clip
 pnpm test                         # decision logic, no API calls
 ```
@@ -97,6 +101,43 @@ a brown order gave HOLD REFUND ("the packed wallet was brown while the
 returned wallet is clearly maroon/burgundy"); the brown wallet itself, shown
 only closed, gave INSPECT BY HAND and asked for a photo of the open interior
 before refunding.
+
+## Try to fool it
+
+`pnpm verify` checks a copy of the evidence against the receipt: the
+SHA-256 written at packing time, and frame-to-frame jumps (ffmpeg scdet; our
+real takes peak near 1.2). For each jump, Muse Spark says what changed. We
+forged our own evidence from bench-02: the original came back VALID; a
+re-encoded copy NOT THE RECORDED FILE (hash mismatch, no jumps); 2 seconds
+cut out TAMPERED at 9.5 s (jump 8.0: "the single hand holding a reddish-brown
+wallet was replaced by two hands holding a cream-colored pouch"); another
+pack spliced in TAMPERED at 9.5 s and 11.5 s (jump 26.0).
+
+## Claims desk
+
+`pnpm appeal` splits a claim into its assertions and marks each
+contradicted, supported or unresolved from the receipt, with the frame that
+shows it, then drafts a short reply citing frames and the hash. For "only the
+empty pouch, no wallet, care card missing": the empty pouch and the missing
+card are contradicted (frames 54 and 82); what happened in transit is
+unresolved, because a packing video cannot show it. Any supported point goes
+to a person.
+
+## Voice scan
+
+No barcode scanner? The packer says the order, in Hinglish. Muse Voice
+Transcribe (`muse-voice-transcribe-1.0`, catalogue names as keywords) turns
+the note into text, and Muse Spark maps it to the scan list `pnpm check`
+takes. "Ek Cherry Blend wallet aur ek leather care card" became
+`--item "wallet=1" --item "white printed card=1"` (Cherry Blend). Anything it
+cannot map is listed as unclear, never guessed.
+
+## Packed for you
+
+Before a cash-on-delivery parcel arrives, the customer can get a short
+vertical clip of their own wallet being packed: cut from the bench video,
+the exact wallet spotlighted with SAM 3.1's mask, a one-line note from Muse
+Spark, and the receipt hash.
 
 ## How the check decides
 

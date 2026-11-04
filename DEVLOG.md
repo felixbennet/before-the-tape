@@ -227,3 +227,22 @@ and run them through `pnpm sam` to decide go or no-go.
   BY HAND, asking for an interior photo. Return photos stand in from bench
   clips; real returns footage is next.
 - Spend to date: $2.93.
+
+### Day 10, small hours: more brains, four more features
+
+- Asked seven models for ideas (GPT-6 Astra, Gemini 4 Argon, DeepSeek V4
+  Pro, Qwen 3.8 Max, GLM 5.3, MiniMax M3, with Claude Opus), plus a third
+  web pass. Most-repeated ideas: try to forge our own evidence; answer
+  claims point by point; let the packer speak the order; show the customer
+  their own pack.
+- `pnpm verify`: original VALID; re-encode NOT THE RECORDED FILE; 2 s cut
+  TAMPERED at 9.5 s (jump 8.0); splice TAMPERED at 9.5 and 11.5 s (jump
+  26.0). Real takes peak near 1.2; threshold 4.
+- `pnpm appeal`: empty-pouch and missing-card claim; two points
+  contradicted with frames 54 and 82, transit unresolved.
+- Voice scan with Muse Voice Transcribe: two Hinglish test notes
+  (synthesized) both mapped to the right scan list. "Do" (two) was heard as
+  "The" in one note; the list still came out right because each variant had
+  its own "ek".
+- Trust clip: vertical "packed for you" clip with the SAM-spotlighted
+  wallet and a Muse Spark note.

@@ -8,6 +8,8 @@
     "check": "tsx scripts/check.ts",
     "receipt": "tsx scripts/receipt.ts",
     "live": "tsx scripts/live.ts",
+    "verify": "tsx scripts/verify-take.ts",
+    "appeal": "tsx scripts/appeal.ts",
     "returns": "tsx scripts/returns.ts",
     "test": "tsx scripts/events.test.ts",
     "typecheck": "tsc --noEmit"
