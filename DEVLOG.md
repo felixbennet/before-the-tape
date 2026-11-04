@@ -191,3 +191,17 @@ and run them through `pnpm sam` to decide go or no-go.
   with Meta's `@meta-sam/parser` and painted onto the clips
   (`scripts/render-masks.ts`), from the saved runs, no new calls.
 - Spend to date: $2.50.
+- Agent `follow` action: boxes are named per frame ("B2"); Muse Spark can ask
+  SAM 3.1 to re-track one object from a box prompt. Tested on bench-02 from
+  the wallet in hand at frame 15: one identity from the stack (frame 0)
+  through the hands to the pouch mouth, last seen frame 53, the same frame
+  Muse Spark found; spare wallets dropped out. In the next full agent run
+  Muse Spark chose frame ranges (46-60, then 81-84) rather than a follow and
+  ended CONSISTENT in round 3.
+- Custody receipt (`pnpm receipt`), after reading how Indian marketplace
+  claims get rejected (cuts in video, nothing tying the item to the box).
+  bench-02: one unbroken take (1199 frames, max timestamp gap 33 ms, 0 scene
+  cuts); SAM followed the handled wallet frame 11 to 54; "cream drawstring
+  pouch" tracked with 0 missing frames until inside the box at frame 87
+  ("cloth pouch" found nothing; appearance words again). Proof JPEG 169 KB.
+- Spend to date: $2.76.

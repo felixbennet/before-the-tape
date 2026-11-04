@@ -15,7 +15,7 @@ export type SparkStep = { frame: number; seconds: number; what: string };
 export type Identity = 'yes' | 'no' | 'unclear' | 'no_reference';
 export type SparkCount = { item: string; expected: number; seen_in: number; reference_pick: number; reference_note: string };
 // Evidence Spark asks for when the frames it has do not settle a step.
-export type Need = { kind: 'frames' | 'closeup'; from_frame: number; to_frame: number; reason: string };
+export type Need = { kind: 'frames' | 'closeup' | 'follow'; from_frame: number; to_frame: number; detection: string; reason: string };
 export type SparkRaw = { verdict: Verdict; summary: string; steps: SparkStep[]; counts: SparkCount[]; need: Need[] };
 export type SparkResult = SparkRaw & { spark_verdict: Verdict; why: string[]; identity: Identity[] };
 
@@ -25,16 +25,24 @@ export const tag = (i: number) => String.fromCharCode(65 + i);
 
 // The chosen frames of the downsampled clip, with each layer's boxes and a time
 // stamp burned in, scaled to 640 px wide to keep image tokens low.
+// Every detection on a frame gets a name the agent can point at: layer tag plus
+// its position left to right, e.g. "B2" is the second wallet box from the left.
+export function detectionsOn(layers: Layer[], frame: number): { name: string; layer: number; hit: Hit }[] {
+  return layers.flatMap((l, i) => l.hits.filter((h) => h.frame === frame).sort((a, b) => a.box[0] - b.box[0])
+    .map((hit, n) => ({ name: `${tag(i)}${n + 1}`, layer: i, hit })));
+}
+
 export function annotatedFrames(clipFile: string, layers: Layer[], frameList: number[], fps: number): { frame: number; file: string }[] {
   const dir = path.join('data/frames', path.parse(clipFile).name);
   fs.mkdirSync(dir, { recursive: true });
   const out: { frame: number; file: string }[] = [];
   for (const f of frameList) {
-    const draws = layers.flatMap((l, i) => l.hits.filter((h) => h.frame === f).map((h) => {
-      const [x1, y1, x2, y2] = h.box;
-      return `drawbox=x=${x1}:y=${y1}:w=${x2 - x1}:h=${y2 - y1}:color=${l.color}:t=5,` +
-        `drawtext=text='${tag(i)}':x=${x1}:y=${Math.max(0, y1 - 26)}:fontsize=22:fontcolor=white:box=1:boxcolor=${l.color}`;
-    }));
+    const draws = detectionsOn(layers, f).map(({ name, layer, hit }) => {
+      const [x1, y1, x2, y2] = hit.box;
+      const color = layers[layer].color;
+      return `drawbox=x=${x1}:y=${y1}:w=${x2 - x1}:h=${y2 - y1}:color=${color}:t=5,` +
+        `drawtext=text='${name}':x=${x1}:y=${Math.max(0, y1 - 26)}:fontsize=22:fontcolor=white:box=1:boxcolor=${color}`;
+    });
     const stamp = `drawtext=text='frame ${f}  ${(f / fps).toFixed(1)}s':x=10:y=10:fontsize=26:fontcolor=yellow:box=1:boxcolor=black`;
     const vf = [`select=eq(n\\,${f})`, ...draws, stamp, 'scale=640:-2'].join(',');
     const file = path.join(dir, `f${String(f).padStart(4, '0')}.jpg`);
@@ -69,8 +77,8 @@ const SCHEMA = {
   additionalProperties: false,
   required: ['verdict', 'summary', 'steps', 'counts', 'need'],
   properties: {
-    need: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['kind', 'from_frame', 'to_frame', 'reason'],
-      properties: { kind: { type: 'string', enum: ['frames', 'closeup'] }, from_frame: { type: 'integer' }, to_frame: { type: 'integer' }, reason: { type: 'string' } } } },
+    need: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['kind', 'from_frame', 'to_frame', 'detection', 'reason'],
+      properties: { kind: { type: 'string', enum: ['frames', 'closeup', 'follow'] }, from_frame: { type: 'integer' }, to_frame: { type: 'integer' }, detection: { type: 'string' }, reason: { type: 'string' } } } },
     verdict: { type: 'string', enum: ['consistent', 'mismatch', 'uncertain'] },
     summary: { type: 'string' },
     steps: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['frame', 'seconds', 'what'],
@@ -149,7 +157,7 @@ export async function sparkVerdict(frames: { frame: number; file: string }[], ex
         `This is round ${agent.round} of an investigation. You were sent about one frame per second, plus any frames you asked for in earlier rounds. The clip has ${agent.totalFrames} frames (0 to ${agent.totalFrames - 1}).`,
         `The segmentation model's track events, as hints of where things happen: ${agent.samEvents.join('; ') || 'none'}.`,
         ...(agent.asked.length ? [`In earlier rounds you asked for: ${agent.asked.join('; ')}. Those frames are now included.`] : []),
-        'need: if a step you must verify (above all an item going into packaging, or being taken out) happened between frames you were shown, or you cannot tell which candidate photo matches, ask for evidence. kind "frames" with a frame range to see every frame in it (at most 15 frames), or kind "closeup" with the frame range where the item is held clearest. Give the reason. Leave need empty when the frames already settle it. Your verdict this round must reflect only what you have actually seen; if a link is missing, say uncertain and ask.',
+        'need: if a step you must verify (above all an item going into packaging, or being taken out) happened between frames you were shown, or you cannot tell which candidate photo matches, ask for evidence. kind "frames" with a frame range to see every frame in it (at most 15 frames), or kind "closeup" with the frame range where the item is held clearest. If several boxes of the same kind are on the bench (spare stock) and you must know where the scanned one went, kind "follow": put the frame in from_frame and the name of the box that is the item being packed in detection (boxes are named by tag and left-to-right position, e.g. "B2"); the segmentation model then tracks that one object through the whole clip and reports where it was last seen. Give the reason; use "" for detection unless kind is "follow". Leave need empty when the frames already settle it. Your verdict this round must reflect only what you have actually seen; if a link is missing, say uncertain and ask.',
       ]
     : [
         'There is roughly one frame per second, with extra consecutive frames around the moments where the detector saw an item appear or vanish. Look closely at those runs: that is usually where an item goes into packaging.',
@@ -159,7 +167,7 @@ export async function sparkVerdict(frames: { frame: number; file: string }[], ex
     'You are checking one parcel being packed at a warehouse bench, filmed from above.',
     `The frames below are in time order (source ${fps} frames per second); each is stamped with its frame number and seconds.`,
     ...sampling,
-    `Coloured boxes are object detections from a segmentation model, tagged by what it was asked to find: ${detectors.map((d, i) => `${tag(i)} = "${d}"`).join(', ')}. They can miss objects or mark wrong ones; trust what you see in the image over the boxes.`,
+    `Coloured boxes are object detections from a segmentation model, tagged by what it was asked to find and numbered left to right on each frame: ${detectors.map((d, i) => `${tag(i)} = "${d}"`).join(', ')}. They can miss objects or mark wrong ones; trust what you see in the image over the boxes.`,
     `The barcode scan says the parcel must contain: ${expected.map((e) => `${e.expected} x ${e.phrase}`).join(', ')}.`,
     'Packaging can be nested (for example an item goes into a cloth pouch, the pouch into a box). An item counts as packed if it ends up inside the final closed container, directly or inside inner packaging.',
     'Ignore spare stock lying elsewhere on the desk.',

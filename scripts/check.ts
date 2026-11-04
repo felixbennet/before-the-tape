@@ -8,9 +8,10 @@
 //    gives the verdict, following nested packaging and citing frames.
 import fs from 'node:fs';
 import path from 'node:path';
-import { prepareClip, segment, type Hit } from '../src/sam.js';
+import { execFileSync } from 'node:child_process';
+import { prepareClip, segment, trackObject, type Hit } from '../src/sam.js';
 import { closeups, framesFor, packEvents, parcelTrack, pickFrames, trackEdges, trackEvents, verdict, type PackEvent, type Verdict } from '../src/events.js';
-import { annotatedFrames, crops, sparkVerdict, type AgentContext, type Expected, type Layer, type Need } from '../src/spark.js';
+import { annotatedFrames, crops, detectionsOn, sparkVerdict, tag, type AgentContext, type Expected, type Layer, type Need } from '../src/spark.js';
 
 const args = process.argv.slice(2);
 const clipPath = args[0];
@@ -91,26 +92,47 @@ if (!args.includes('--agent')) {
   let candidates: AgentContext['candidates'];
   let added: number[] = [];
   let addedCloseups = 0;
+  let follows = 0;
+  // SAM's frame size, for box prompts in its own pixel space.
+  const [samW] = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width', '-of', 'csv=p=0', clip.file]).toString().split(',').map(Number);
   for (let round = 1; ; round++) {
-    spark = await sparkVerdict(frames, items, detectors, fps, { round, totalFrames: clip.frames, samEvents, asked, candidates });
+    spark = await sparkVerdict(frames, items, layers.map((l) => l.label), fps, { round, totalFrames: clip.frames, samEvents, asked, candidates });
     candidates = spark.candidates;
     rounds.push({ round, sent: frames.length, added, closeups: addedCloseups, need: spark.need, spark_verdict: spark.spark_verdict, verdict: spark.verdict, summary: spark.summary });
-    console.log(`round ${round}: ${frames.length} frames -> ${spark.verdict.toUpperCase()}${spark.need.map((n) => `\n  asks for ${n.kind} ${n.from_frame}-${n.to_frame}: ${n.reason}`).join('')}`);
+    console.log(`round ${round}: ${frames.length} frames -> ${spark.verdict.toUpperCase()}${spark.need.map((n) => `\n  asks for ${n.kind} ${n.from_frame}-${n.to_frame}${n.detection ? ` ${n.detection}` : ''}: ${n.reason}`).join('')}`);
     if (!spark.need.length || round === 3) break;
     added = [];
     addedCloseups = 0;
+    let followed = false;
     for (const n of spark.need) {
       if (n.kind === 'frames') added.push(...framesFor(n, clip.frames, [...frames.map((f) => f.frame), ...added]));
-      else for (const [i, item] of items.entries()) {
+      else if (n.kind === 'follow') {
+        // Muse Spark picked one detection; SAM 3.1 re-tracks that single object
+        // with a box prompt, so spare stock of the same kind drops out.
+        const det = detectionsOn(layers, n.from_frame).find((d) => d.name === n.detection.trim().toUpperCase());
+        if (!det || follows >= 2) { asked.push(`follow ${n.detection} at frame ${n.from_frame} (${det ? 'limit reached' : 'no such box'})`); continue; }
+        follows++;
+        const base = layers[det.layer].label;
+        const hits = await trackObject(clip.media, { width: samW, height: 720 }, n.from_frame, det.hit.box, clip.frames, `follow-${path.parse(clipPath).name}-${n.detection}-f${n.from_frame}`);
+        layers.push({ label: `followed ${base}`, color: 'yellow', hits });
+        const seen = [...new Set(hits.map((h) => h.frame))].sort((a, b) => a - b);
+        if (seen.length) {
+          const first = seen[0], last = seen.at(-1)!;
+          samEvents.push(`the followed ${base} (${n.detection} on frame ${n.from_frame}, now tag ${tag(layers.length - 1)}) was tracked as one object from frame ${first} to frame ${last}; last seen at frame ${last}`);
+          added.push(...framesFor({ from_frame: last - 3, to_frame: last + 1 }, clip.frames, [...frames.map((f) => f.frame), ...added], 5));
+        } else samEvents.push(`following ${n.detection} on frame ${n.from_frame} found no object`);
+        console.log(`  SAM followed ${n.detection} from frame ${n.from_frame}: frames ${seen[0]}-${seen.at(-1)}`);
+        followed = true;
+      } else for (const [i, item] of items.entries()) {
         if (!item.image) continue;
         const inRange = itemHits[i].filter((h) => h.frame >= Math.min(n.from_frame, n.to_frame) && h.frame <= Math.max(n.from_frame, n.to_frame));
         const more = crops(clipPath, closeups(inRange, 2, 3), fps).filter((f) => !(item.closeups ?? []).includes(f));
         item.closeups = [...(item.closeups ?? []), ...more].slice(0, 4);
         addedCloseups += more.length;
       }
-      asked.push(`${n.kind} ${n.from_frame}-${n.to_frame} (${n.reason})`);
+      asked.push(n.kind === 'follow' ? `follow ${n.detection} on frame ${n.from_frame} (${n.reason})` : `${n.kind} ${n.from_frame}-${n.to_frame} (${n.reason})`);
     }
-    if (!added.length && !addedCloseups) break;
+    if (!added.length && !addedCloseups && !followed) break;
     frames = [...frames, ...annotatedFrames(clip.file, layers, added, fps)].sort((a, b) => a.frame - b.frame);
   }
 }

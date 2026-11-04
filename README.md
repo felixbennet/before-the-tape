@@ -37,7 +37,8 @@ pnpm smoke                        # free: checks the key and model access
 pnpm sam <image|clip|url> "belt buckle"
 pnpm check <clip> --item "wallet=1" --item "white printed card=1" \
   --ref "wallet=<catalogue photo>|<product>" --decoy "wallet=<look-alike photo>"
-pnpm check <clip> ... --agent     # Muse Spark asks for the frames or close-ups it needs
+pnpm check <clip> ... --agent     # Muse Spark asks for the frames, close-ups or SAM follows it needs
+pnpm receipt <clip> <check.json> --container "cream drawstring pouch"   # custody receipt + proof JPEG
 pnpm exec tsx scripts/render-masks.ts <clip> out.mp4 "cardboard box" "wallet"   # SAM masks on the clip
 pnpm test                         # decision logic, no API calls
 ```
@@ -52,6 +53,24 @@ The code fetches exactly that (clamped, at most 15 frames a request, up to 3
 rounds) and asks again. On bench-02, round 1 could not see the wallet go into
 the pouch and asked for frames 46 to 60; round 2 saw it at frame 53 and the
 check passed. A request for more evidence is never a pass.
+
+Muse Spark can also point SAM at one object: every box on a frame is named
+by tag and position ("B2"), and a `follow` request makes SAM 3.1 re-track
+that single object from a box prompt, so spare stock of the same kind
+drops out.
+
+## Custody receipt
+
+Marketplace and courier claims in India are often rejected on procedure: a
+cut in the video, or nothing proving the item stayed in the box.
+`pnpm receipt` checks the take is unbroken (frame timestamps, scene cuts),
+has SAM 3.1 follow the exact item the packer handled with a box prompt until
+it vanishes into its container, follows that container until it is inside
+the parcel box, and writes one proof JPEG (well under the 2 MB claim limit)
+with the scan, the verdict, the key frames and the clip's SHA-256. On
+bench-02: one unbroken 20 s take, 0 cuts; wallet followed from frame 11 to
+frame 54 into the pouch; pouch in view with 0 frames missing until inside
+the box at frame 87.
 
 ## How the check decides
 

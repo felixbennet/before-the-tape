@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import type { Box, Hit } from '../src/sam.js';
 import { closeups, framesFor, packEvents, parcelRegion, parcelTrack, pickFrames, trackEdges, verdict } from '../src/events.js';
 import { parseHits } from '../src/sam.js';
-import { decide, shuffleCandidates, type Expected, type SparkRaw } from '../src/spark.js';
+import { decide, detectionsOn, shuffleCandidates, type Expected, type SparkRaw } from '../src/spark.js';
 
 const parcel: Box = [400, 400, 800, 800];
 // A 60 px item whose center follows the given points, one point per frame.
@@ -93,7 +93,12 @@ assert.equal(d(raw({ verdict: 'mismatch' })).verdict, 'uncertain');
 assert.equal(decide(raw({}, 0), [{ phrase: 'wallet', expected: 1 }], [null], [10], 5).verdict, 'consistent');
 assert.equal(shuffleCandidates(wallet, () => 0)!.answer, 2);
 // Asking for more evidence is never a pass.
-assert.equal(d(raw({ need: [{ kind: 'frames', from_frame: 30, to_frame: 44, reason: 'wallet into pouch not seen' }] })).verdict, 'uncertain');
+assert.equal(d(raw({ need: [{ kind: 'frames', from_frame: 30, to_frame: 44, detection: '', reason: 'wallet into pouch not seen' }] })).verdict, 'uncertain');
+// Detections are named by tag and left-to-right order, so the agent can point at one.
+const named = detectionsOn([{ label: 'wallet', color: 'green', hits: [
+  { frame: 7, id: 4, box: [500, 10, 560, 60], c: 0.9 }, { frame: 7, id: 9, box: [100, 10, 160, 60], c: 0.9 }, { frame: 8, id: 4, box: [0, 0, 1, 1], c: 0.9 },
+] }], 7);
+assert.deepEqual(named.map((d) => [d.name, d.hit.id]), [['A1', 9], ['A2', 4]]);
 // The agent's frame requests are clamped and capped.
 assert.deepEqual(framesFor({ from_frame: -5, to_frame: 3 }, 100, []), [0, 1, 2, 3]);
 assert.equal(framesFor({ from_frame: 0, to_frame: 99 }, 100, []).length, 15);

@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { buildObjectPrompt } from '@meta-sam/parser';
 import { meta, spend, PRICE } from './meta.js';
 
 export type Box = [number, number, number, number]; // x1, y1, x2, y2 in clip pixels
@@ -46,9 +47,16 @@ export function parseHits(text: string): Hit[] {
   return hits;
 }
 
-// Runs one phrase and saves the raw wire text to data/runs/ for later analysis.
-export async function segment(media: Media, phrase: string, frames: number | null): Promise<Hit[]> {
-  const text = await spend(samCost(frames), `sam:${phrase}`, async () => {
+// Follow one specific object: a box prompt on one frame, tracked through the
+// whole clip (forward and backward). `size` is SAM's frame size (w x 720).
+export function trackObject(media: Media, size: { width: number; height: number }, frame: number, box: Box, frames: number | null, label: string): Promise<Hit[]> {
+  const text = buildObjectPrompt({ size, objects: [{ id: 1, prompts: [{ frame, box: { left: box[0], top: box[1], right: box[2] + 1, bottom: box[3] + 1 } }] }] });
+  return segment(media, text, frames, label);
+}
+
+// Runs one phrase (or an object prompt) and saves the raw wire text to data/runs/ for later analysis.
+export async function segment(media: Media, phrase: string, frames: number | null, label = phrase): Promise<Hit[]> {
+  const text = await spend(samCost(frames), `sam:${label}`, async () => {
     const stream = await meta.responses.create({
       model: 'sam-3.1',
       // The SDK types only know OpenAI's own content parts; Meta adds input_video.
@@ -61,6 +69,6 @@ export async function segment(media: Media, phrase: string, frames: number | nul
     return out;
   });
   fs.mkdirSync('data/runs', { recursive: true });
-  fs.writeFileSync(`data/runs/${new Date().toISOString().replace(/[:.]/g, '-')}-${phrase.replace(/\W+/g, '_')}.txt`, text);
+  fs.writeFileSync(`data/runs/${new Date().toISOString().replace(/[:.]/g, '-')}-${label.replace(/\W+/g, '_')}.txt`, text);
   return parseHits(text);
 }

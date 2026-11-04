@@ -13,10 +13,14 @@ import { parseHits, type Hit } from '../src/sam.js';
 const [clipPath, out, ...phrases] = process.argv.slice(2);
 if (!clipPath || !out || !phrases.length) throw new Error('usage: render-masks.ts <clip> <out.mp4> <phrase>...');
 const fps = 5;
-const colors: [number, number, number][] = [[59, 130, 246], [34, 197, 94], [249, 115, 22], [217, 70, 239]];
+// A "run:" layer (a single followed object) is drawn in yellow.
+const palette: [number, number, number][] = [[59, 130, 246], [34, 197, 94], [249, 115, 22], [217, 70, 239]];
+const colors = phrases.map((p, i): [number, number, number] => (p.startsWith('run:') ? [250, 204, 21] : palette[i % palette.length]));
 
 // The saved raw run whose boxes match this clip's cached SAM hits for a phrase.
+// "run:<file>" uses one saved run directly, e.g. a box-prompted follow track.
 function rawRunFor(phrase: string): string {
+  if (phrase.startsWith('run:')) return fs.readFileSync(phrase.slice(4), 'utf8');
   const slug = phrase.replace(/\W+/g, '_');
   const cache = fs.readdirSync('data/cache').find((n) => n.startsWith(path.parse(clipPath).name) && n.endsWith(`-5-${slug}.json`));
   if (!cache) throw new Error(`no cached SAM hits for "${phrase}" on ${clipPath}`);
