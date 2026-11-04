@@ -205,3 +205,25 @@ and run them through `pnpm sam` to decide go or no-go.
   pouch" tracked with 0 missing frames until inside the box at frame 87
   ("cloth pouch" found nothing; appearance words again). Proof JPEG 169 KB.
 - Spend to date: $2.78.
+
+### Day 9, late night: live pause and returns bench
+
+- Live pause (`pnpm live`): the scan triggers a small Muse Spark call (2
+  frames from the second before the scan, the shuffled line-up, low
+  reasoning effort). First try at default effort with 3 frames took 15 s and
+  landed after the lid; low effort with 2 frames: 7 to 9 s.
+
+  | Clip | Scan | Muse Spark picked | Bench | Latency |
+  |---|---|---|---|---|
+  | bench-05 | Cherry Blend (wrong) | Rugged Brown | PAUSE | 8.6 s |
+  | bench-05 | Rugged Brown (right) | Rugged Brown | CONTINUE | 8.7 s |
+  | bench-06 | Rugged Brown (wrong) | Cherry Blend | PAUSE | 7.3 s |
+  | bench-06 | Cherry Blend (right) | Cherry Blend | CONTINUE | 7.2 s |
+
+  Real-time replays of recorded clips stand in for the camera feed.
+- Returns bench (`pnpm returns`): Muse Spark compares the return photos with
+  the outbound close-ups SAM cut from the packing video. Burgundy wallet for
+  a brown order: HOLD REFUND. The brown wallet itself, closed only: INSPECT
+  BY HAND, asking for an interior photo. Return photos stand in from bench
+  clips; real returns footage is next.
+- Spend to date: $2.93.

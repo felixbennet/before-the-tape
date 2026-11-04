@@ -7,6 +7,8 @@
     "sam": "tsx scripts/sam.ts",
     "check": "tsx scripts/check.ts",
     "receipt": "tsx scripts/receipt.ts",
+    "live": "tsx scripts/live.ts",
+    "returns": "tsx scripts/returns.ts",
     "test": "tsx scripts/events.test.ts",
     "typecheck": "tsc --noEmit"
   },

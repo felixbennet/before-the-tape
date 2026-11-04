@@ -8,8 +8,9 @@ Hackathon (Oct 26 to Nov 4, 2026), Startup track.
 Status: submitted prototype. It checks recorded bench clips end to end: SAM
 3.1 tracks the parcel and items, Muse Spark 1.3 follows the nested packing
 and picks which catalogue photo the packed item is, and code decides the
-verdict. Early results, with the exact test cases, are in [DEVLOG.md](DEVLOG.md).
-A live pause at the bench before the seal is the next step, not built yet.
+verdict. It also runs live (a pause before the seal), writes a custody
+receipt for claims, and checks returns. Early results, with the exact test
+cases, are in [DEVLOG.md](DEVLOG.md).
 
 ## What existed before the hackathon, and what was built during it
 
@@ -39,6 +40,8 @@ pnpm check <clip> --item "wallet=1" --item "white printed card=1" \
   --ref "wallet=<catalogue photo>|<product>" --decoy "wallet=<look-alike photo>"
 pnpm check <clip> ... --agent     # Muse Spark asks for the frames, close-ups or SAM follows it needs
 pnpm receipt <clip> <check.json> --container "cream drawstring pouch"   # custody receipt + proof JPEG
+pnpm live <clip> --scan-at 4.0 --seal-at 21.8 --ref "<photo>|<product>" --decoy <photo>   # live pause
+pnpm returns <outbound clip> --returned <photo> --returned <photo>   # returns bench
 pnpm exec tsx scripts/render-masks.ts <clip> out.mp4 "cardboard box" "wallet"   # SAM masks on the clip
 pnpm test                         # decision logic, no API calls
 ```
@@ -71,6 +74,29 @@ with the scan, the verdict, the key frames and the clip's SHA-256. On
 bench-02: one unbroken 20 s take, 0 cuts; wallet followed from frame 11 to
 frame 54 into the pouch; pouch in view with 0 frames missing until inside
 the box at frame 87.
+
+## Live pause
+
+`pnpm live` runs while the packer is still working. The barcode scan
+triggers it: the last second of camera frames and the shuffled catalogue
+line-up go to Muse Spark (low reasoning effort, so it answers in seconds),
+and the bench gets CONTINUE or PAUSE before the parcel is sealed. Tested on
+real-time replays of the bench clips (the recorded clip plays at real speed
+as the camera feed; the scan time comes from the scan log): 4 of 4 right,
+both wrong scans paused and both right scans continued, 7 to 9 s after the
+scan. On bench-05 the PAUSE landed at 12.6 s, before the pouch reached the
+box (16 s), the lid (17.8 s) and the mailer seal (21.8 s).
+
+## Returns bench
+
+`pnpm returns` compares the item that came back with the close-ups SAM cut
+from that order's packing video, and turns Muse Spark's answer into an
+action: ACCEPT RETURN, HOLD REFUND, or INSPECT BY HAND. Controlled tests
+(return photos stand in from our bench clips): a burgundy wallet returned for
+a brown order gave HOLD REFUND ("the packed wallet was brown while the
+returned wallet is clearly maroon/burgundy"); the brown wallet itself, shown
+only closed, gave INSPECT BY HAND and asked for a photo of the open interior
+before refunding.
 
 ## How the check decides
 
