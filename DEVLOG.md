@@ -138,3 +138,37 @@ and run them through `pnpm sam` to decide go or no-go.
   clips, ground truth written down before running, prompts frozen, and
   the confusion table reported with the uncertain rate.
 - Spend to date: $1.90.
+
+## Day 9, Wed Nov 4 2026: results on the final pipeline, and the demo
+
+- The day 3 packing table above was run before the verdict moved into
+  code and before the new frame picker. Re-read on the final pipeline
+  (saved checks from the later runs, same four cases):
+
+  | Clip | Scan list given | SAM tracks alone | SAM + Muse Spark | Correct answer |
+  |---|---|---|---|---|
+  | bench-02 | 1 wallet, 1 care card | mismatch | CONSISTENT | consistent |
+  | bench-02 | 2 wallets, 1 care card (wrong on purpose) | mismatch | MISMATCH | mismatch |
+  | bench-05 | 1 wallet | uncertain | CONSISTENT | consistent |
+  | bench-06 | 1 wallet, 1 care card | consistent | CONSISTENT | consistent |
+
+  SAM's tracks alone: 2 of 4 (1 of 4 on the day 3 pipeline). SAM with
+  Muse Spark: 4 of 4. Muse Spark's packing verdict was also consistent in
+  all 12 variant-test runs on bench-05 and bench-06. Three real packs plus
+  one deliberately wrong scan; small, and reported as such.
+- The bench-06 step times in the demo (wallet into pouch at frame 40,
+  8.0 s; pouch into box at frame 70; card at 78; lid at 83; mailer at 95)
+  come from the saved bench-06 run of 29 Oct 13:21 UTC. The 10.0 / 15.0 /
+  17.0 s times earlier in this log are from bench-02, a different clip.
+- Cost per check at list prices: SAM 3.1 video is $0.20 per 1000 frames,
+  so a 20 s clip at 5 fps (100 frames) is about $0.02 per phrase, three
+  phrases about $0.06; one Muse Spark verdict with about 45 frames, close
+  ups and four catalogue photos averaged about $0.09 across the six
+  variant runs. Under $0.20 a check.
+- Built the 3-minute demo video (HyperFrames, HTML rendered to video)
+  from the real bench clips with SAM's boxes burned in and Muse Spark's
+  cited steps. An outside review (GPT-6 Astra and Claude Opus) tightened
+  the claims: denominators on every number, "uncertain, never a pass"
+  instead of "never guesses", and the wrong-scan test labelled as a
+  controlled test.
+- Spend to date: $1.99.

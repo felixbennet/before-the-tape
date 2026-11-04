@@ -5,9 +5,11 @@ reconciles it against the barcode scan, and keeps the evidence for when a
 claim or courier dispute arrives. Built for the Meta Global AI Developer
 Hackathon (Oct 26 to Nov 4, 2026), Startup track.
 
-Status: day 3. Runs end to end on real bench footage: SAM 3.1 tracks the
-parcel and items, Muse Spark 1.3 follows the nested packing and picks which
-catalogue photo the packed item is. First results are in [DEVLOG.md](DEVLOG.md).
+Status: submitted prototype. It checks recorded bench clips end to end: SAM
+3.1 tracks the parcel and items, Muse Spark 1.3 follows the nested packing
+and picks which catalogue photo the packed item is, and code decides the
+verdict. Early results, with the exact test cases, are in [DEVLOG.md](DEVLOG.md).
+A live pause at the bench before the seal is the next step, not built yet.
 
 ## What existed before the hackathon, and what was built during it
 
@@ -57,4 +59,4 @@ pnpm test                         # decision logic, no API calls
    every link: cited frames that it was really shown, counts equal to the
    scan, and the scanned photo picked. A different photo picked, or a
    counted shortfall it also calls a mismatch, is **mismatch**. Anything else,
-   including the model contradicting itself, is **uncertain**. It never guesses.
+   including the model contradicting itself, is **uncertain**, never a pass.
