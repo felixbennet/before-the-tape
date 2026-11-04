@@ -28,6 +28,8 @@ architecture, testing and decisions are mine. Daily notes: [DEVLOG.md](DEVLOG.md
 - **SAM 3.1** segments and tracks the parcel and each item through bench video.
 - **Muse Spark 1.3** reads the frames SAM points it to, follows the packing
   step by step, and tells the scanned product apart from look-alike variants.
+- **Muse Voice Transcribe 1.0** turns a packer's Hinglish voice note into the
+  scan list.
 
 ## Setup
 
