@@ -228,7 +228,7 @@ and run them through `pnpm sam` to decide go or no-go.
   clips; real returns footage is next.
 - Spend to date: $2.93.
 
-### Day 10, Thu Nov 5 2026: four more features from outside ideas
+### Day 9, last: four more features from outside ideas
 
 - Asked seven models for ideas (GPT-6 Astra, Gemini 4 Argon, DeepSeek V4
   Pro, Qwen 3.8 Max, GLM 5.3, MiniMax M3, with Claude Opus), plus a third
